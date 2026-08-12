@@ -196,7 +196,7 @@
 
       // 1. Chargement direct anonyme du fichier data.json servi par GitHub Pages
       try {
-        const res = await fetch(`./data.json?t=${Date.now()}`, { cache: 'no-cache' });
+        const res = await fetch(`./data.json?t=${Date.now()}`);
         if (res.ok) {
           const json = await res.json();
           totalEuros = json.totalEuros || 0;
@@ -218,8 +218,7 @@
         try {
           const res = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/data.json?t=${Date.now()}`, {
             headers: { 
-              'Authorization': `Bearer ${token}`,
-              'Cache-Control': 'no-cache'
+              'Authorization': `Bearer ${token}`
             }
           });
           if (!res.ok) throw new Error('Erreur API');

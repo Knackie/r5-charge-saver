@@ -68,7 +68,7 @@
         <summary class="cursor-pointer font-semibold text-slate-300">⚙️ Paramètres & Connexion GitHub</summary>
         
         <div class="space-y-3 pt-3 border-b border-slate-800 pb-3">
-          <p class="font-semibold text-slate-200">Configuration API GitHub (Synchro data.json) :</p>
+          <p class="font-semibold text-slate-200">Configuration API GitHub (Écriture dans data.json) :</p>
           <div>
             <label class="block mb-1">Pseudo GitHub</label>
             <input type="text" id="ghUser" placeholder="ex: mon-pseudo" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-slate-200" onchange="sauvegarderConfig()">
@@ -81,7 +81,7 @@
             <label class="block mb-1">Personal Access Token (PAT)</label>
             <input type="password" id="ghToken" placeholder="github_pat_..." class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-slate-200" onchange="sauvegarderConfig()">
           </div>
-          <button onclick="chargerDepuisGithub()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 py-1.5 rounded transition">Tester & Synchroniser</button>
+          <button onclick="chargerDepuisGithub()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 py-1.5 rounded transition">Activer l'Écriture GitHub</button>
         </div>
 
         <div class="grid grid-cols-2 gap-3 pt-2">
@@ -109,7 +109,7 @@
     <section class="bg-slate-800 p-6 rounded-2xl shadow-xl space-y-4 border border-slate-700">
       <div class="flex justify-between items-center">
         <h2 class="font-bold text-slate-200">Total économisé au cumul</h2>
-        <span id="syncStatus" class="text-xs text-amber-400">Hors-ligne (Local)</span>
+        <span id="syncStatus" class="text-xs text-sky-400">Chargement...</span>
       </div>
       <div id="totalEconomies" class="text-3xl font-black text-amber-400">0,00 €</div>
       <p id="totalDetails" class="text-xs text-slate-400">0 kWh économisés au total</p>
@@ -127,7 +127,7 @@
     document.getElementById('ghRepo').value = localStorage.getItem('r5_gh_repo') || '';
     document.getElementById('ghToken').value = localStorage.getItem('r5_gh_token') || '';
 
-    // Lecture du secours local immédiat au démarrage
+    // Secours local au démarrage
     totalEuros = parseFloat(localStorage.getItem('r5_total_euros')) || 0;
     totalKwh = parseFloat(localStorage.getItem('r5_total_kwh')) || 0;
 
@@ -194,40 +194,54 @@
       const repo = document.getElementById('ghRepo').value.trim();
       const token = document.getElementById('ghToken').value.trim();
 
-      if (!user || !repo || !token) {
-        document.getElementById('syncStatus').innerText = 'Mode Local (Token non renseigné)';
-        document.getElementById('syncStatus').className = 'text-xs text-amber-400';
-        return;
+      // 1. Chargement direct anonyme du fichier data.json servi par GitHub Pages
+      try {
+        const res = await fetch(`./data.json?t=${Date.now()}`, { cache: 'no-cache' });
+        if (res.ok) {
+          const json = await res.json();
+          totalEuros = json.totalEuros || 0;
+          totalKwh = json.totalKwh || 0;
+
+          localStorage.setItem('r5_total_euros', totalEuros);
+          localStorage.setItem('r5_total_kwh', totalKwh);
+          afficherTotal();
+
+          document.getElementById('syncStatus').innerText = '🔵 data.json chargé (Lecture seule)';
+          document.getElementById('syncStatus').className = 'text-xs text-sky-400 font-semibold';
+        }
+      } catch (e) {
+        console.warn("Impossible de lire data.json directement", e);
       }
 
-      try {
-        // Paramètre ?t= anti-cache HTTP
-        const res = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/data.json?t=${Date.now()}`, {
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Cache-Control': 'no-cache'
-          }
-        });
-        if (!res.ok) throw new Error('Erreur API');
-        const data = await res.json();
-        currentSha = data.sha;
-        
-        const contentStr = decodeURIComponent(escape(atob(data.content)));
-        const json = JSON.parse(contentStr);
+      // 2. Si le token est renseigné, appel API GitHub pour récupérer le SHA (pour autoriser l'écriture)
+      if (user && repo && token) {
+        try {
+          const res = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/data.json?t=${Date.now()}`, {
+            headers: { 
+              'Authorization': `Bearer ${token}`,
+              'Cache-Control': 'no-cache'
+            }
+          });
+          if (!res.ok) throw new Error('Erreur API');
+          const data = await res.json();
+          currentSha = data.sha;
+          
+          const contentStr = decodeURIComponent(escape(atob(data.content)));
+          const json = JSON.parse(contentStr);
 
-        totalEuros = json.totalEuros || 0;
-        totalKwh = json.totalKwh || 0;
+          totalEuros = json.totalEuros || 0;
+          totalKwh = json.totalKwh || 0;
 
-        // Mise à jour du secours local avec les données serveur
-        localStorage.setItem('r5_total_euros', totalEuros);
-        localStorage.setItem('r5_total_kwh', totalKwh);
+          localStorage.setItem('r5_total_euros', totalEuros);
+          localStorage.setItem('r5_total_kwh', totalKwh);
 
-        document.getElementById('syncStatus').innerText = '🟢 Connecté à GitHub';
-        document.getElementById('syncStatus').className = 'text-xs text-emerald-400 font-semibold';
-        afficherTotal();
-      } catch (e) {
-        document.getElementById('syncStatus').innerText = '🔴 Erreur Synchro GitHub';
-        document.getElementById('syncStatus').className = 'text-xs text-rose-400 font-semibold';
+          document.getElementById('syncStatus').innerText = '🟢 Connecté (Lecture + Écriture)';
+          document.getElementById('syncStatus').className = 'text-xs text-emerald-400 font-semibold';
+          afficherTotal();
+        } catch (e) {
+          document.getElementById('syncStatus').innerText = '🔴 Erreur Token API';
+          document.getElementById('syncStatus').className = 'text-xs text-rose-400 font-semibold';
+        }
       }
     }
 
@@ -242,7 +256,6 @@
       totalEuros += res.economie;
       totalKwh += res.kwh;
 
-      // Mise à jour locale immédiate de l'IHM + localStorage
       localStorage.setItem('r5_total_euros', totalEuros);
       localStorage.setItem('r5_total_kwh', totalKwh);
       afficherTotal();
@@ -281,6 +294,8 @@
           alert("Erreur réseau lors de la sauvegarde.");
         }
         document.getElementById('btnSave').innerText = "➕ Enregistrer cette recharge";
+      } else if (!token) {
+        alert("Enregistré localement. Pour enregistrer sur GitHub, renseigne ton Token dans les paramètres.");
       }
     }
 

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calculateur Économies Recharge R5</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
+  <div class="max-w-xl mx-auto space-y-6">
+    
+    <header class="text-center space-y-2">
+      <h1 class="text-2xl font-bold text-amber-400">⚡ R5 Charge Saver</h1>
+      <p class="text-slate-400 text-sm">Économies au travail vs Borne publique</p>
+    </header>
+
+    <main class="bg-slate-800 p-6 rounded-2xl shadow-xl space-y-6 border border-slate-700">
+      
+      <!-- Choix mode % ou kWh -->
+      <div class="flex rounded-lg bg-slate-900 p-1 text-sm font-medium">
+        <button id="btnModePct" onclick="setMode('pct')" class="flex-1 py-2 rounded-md bg-amber-500 text-slate-900 font-semibold transition">Par Pourcentage (%)</button>
+        <button id="btnModeKwh" onclick="setMode('kwh')" class="flex-1 py-2 rounded-md text-slate-400 transition">Par Énergie (kWh)</button>
+      </div>
+
+      <!-- Saisie de la charge -->
+      <div id="inputPctGroup" class="space-y-2">
+        <label class="block text-sm text-slate-300">Pourcentage rechargé au travail :</label>
+        <div class="flex items-center gap-3">
+          <input type="number" id="inputPct" value="30" min="1" max="100" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-2xl font-bold text-amber-400 focus:outline-none focus:border-amber-400" oninput="calculer()">
+          <span class="text-xl font-bold text-slate-400">%</span>
+        </div>
+      </div>
+
+      <div id="inputKwhGroup" class="space-y-2 hidden">
+        <label class="block text-sm text-slate-300">Énergie rechargée au travail :</label>
+        <div class="flex items-center gap-3">
+          <input type="number" id="inputKwh" value="15.6" step="0.1" min="0.1" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-2xl font-bold text-amber-400 focus:outline-none focus:border-amber-400" oninput="calculer()">
+          <span class="text-xl font-bold text-slate-400">kWh</span>
+        </div>
+      </div>
+
+      <!-- Puissance travail -->
+      <div class="space-y-2">
+        <label class="block text-sm text-slate-300">Conditions de charge au travail :</label>
+        <select id="puissanceTaff" onchange="calculer()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 font-semibold focus:outline-none focus:border-amber-400">
+          <option value="3">Seul sur la prise (3 kW)</option>
+          <option value="1.5">Partagé avec un collègue (1,5 kW)</option>
+        </select>
+      </div>
+
+      <!-- Résultat de la session -->
+      <div class="bg-emerald-950/50 border border-emerald-500/30 rounded-xl p-5 text-center space-y-2">
+        <span class="text-xs uppercase tracking-wider text-emerald-400 font-semibold">Économie réalisée sur cette charge</span>
+        <div id="resultatEuro" class="text-4xl font-extrabold text-emerald-400">0,00 €</div>
+        <p id="resultatDetails" class="text-xs text-slate-400 pt-1">Équivalent : 0,0 kWh • 0 min sur borne publique</p>
+        <p id="tempsTaff" class="text-xs text-amber-300/90 font-medium pt-1">⏱️ Temps de branchement au travail : 0h00</p>
+      </div>
+
+      <!-- Bouton d'action -->
+      <button id="btnSave" onclick="ajouterSession()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 rounded-xl transition">
+        ➕ Enregistrer cette recharge
+      </button>
+
+      <!-- Regroupement Paramètres -->
+      <details class="text-xs text-slate-400 bg-slate-900/60 p-4 rounded-xl space-y-3">
+        <summary class="cursor-pointer font-semibold text-slate-300">⚙️ Paramètres & Connexion GitHub</summary>
+        
+        <div class="space-y-3 pt-3 border-b border-slate-800 pb-3">
+          <p class="font-semibold text-slate-200">Configuration API GitHub (Synchro data.json) :</p>
+          <div>
+            <label class="block mb-1">Pseudo GitHub</label>
+            <input type="text" id="ghUser" placeholder="ex: mon-pseudo" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-slate-200" onchange="sauvegarderConfig()">
+          </div>
+          <div>
+            <label class="block mb-1">Nom du Dépôt</label>
+            <input type="text" id="ghRepo" placeholder="ex: r5-charge-saver" class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-slate-200" onchange="sauvegarderConfig()">
+          </div>
+          <div>
+            <label class="block mb-1">Personal Access Token (PAT)</label>
+            <input type="password" id="ghToken" placeholder="github_pat_..." class="w-full bg-slate-800 border border-slate-700 rounded p-2 text-slate-200" onchange="sauvegarderConfig()">
+          </div>
+          <button onclick="chargerDepuisGithub()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 py-1.5 rounded transition">Tester & Synchroniser</button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 pt-2">
+          <div>
+            <label class="block">Capacité batterie (kWh)</label>
+            <input type="number" id="capaBatterie" value="52" step="0.1" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-slate-200 mt-1" onchange="calculer()">
+          </div>
+          <div>
+            <label class="block">Prix électricité (€/kWh)</label>
+            <input type="number" id="prixKwh" value="0.297" step="0.001" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-slate-200 mt-1" onchange="calculer()">
+          </div>
+          <div>
+            <label class="block">Prix temps (€/min)</label>
+            <input type="number" id="prixMin" value="0.028" step="0.001" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-slate-200 mt-1" onchange="calculer()">
+          </div>
+          <div>
+            <label class="block">Débit borne publique (kW)</label>
+            <input type="number" id="puissanceBorne" value="25" step="0.1" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-slate-200 mt-1" onchange="calculer()">
+          </div>
+        </div>
+      </details>
+    </main>
+
+    <!-- Affichage Totaux -->
+    <section class="bg-slate-800 p-6 rounded-2xl shadow-xl space-y-4 border border-slate-700">
+      <div class="flex justify-between items-center">
+        <h2 class="font-bold text-slate-200">Total économisé au cumul</h2>
+        <span id="syncStatus" class="text-xs text-amber-400">Hors-ligne (Local)</span>
+      </div>
+      <div id="totalEconomies" class="text-3xl font-black text-amber-400">0,00 €</div>
+      <p id="totalDetails" class="text-xs text-slate-400">0 kWh économisés au total</p>
+    </section>
+  </div>
+
+  <script>
+    let mode = 'pct';
+    let totalEuros = 0;
+    let totalKwh = 0;
+    let currentSha = null;
+
+    // Charger la config locale
+    document.getElementById('ghUser').value = localStorage.getItem('r5_gh_user') || '';
+    document.getElementById('ghRepo').value = localStorage.getItem('r5_gh_repo') || '';
+    document.getElementById('ghToken').value = localStorage.getItem('r5_gh_token') || '';
+
+    function sauvegarderConfig() {
+      localStorage.setItem('r5_gh_user', document.getElementById('ghUser').value.trim());
+      localStorage.setItem('r5_gh_repo', document.getElementById('ghRepo').value.trim());
+      localStorage.setItem('r5_gh_token', document.getElementById('ghToken').value.trim());
+    }
+
+    function setMode(m) {
+      mode = m;
+      document.getElementById('inputPctGroup').classList.toggle('hidden', mode !== 'pct');
+      document.getElementById('inputKwhGroup').classList.toggle('hidden', mode !== 'kwh');
+      document.getElementById('btnModePct').className = mode === 'pct' 
+        ? 'flex-1 py-2 rounded-md bg-amber-500 text-slate-900 font-semibold transition'
+        : 'flex-1 py-2 rounded-md text-slate-400 transition';
+      document.getElementById('btnModeKwh').className = mode === 'kwh' 
+        ? 'flex-1 py-2 rounded-md bg-amber-500 text-slate-900 font-semibold transition'
+        : 'flex-1 py-2 rounded-md text-slate-400 transition';
+      calculer();
+    }
+
+    function formatDuree(minutesTotales) {
+      const h = Math.floor(minutesTotales / 60);
+      const m = Math.round(minutesTotales % 60);
+      return `${h}h${m < 10 ? '0' : ''}${m}`;
+    }
+
+    function calculer() {
+      const capa = parseFloat(document.getElementById('capaBatterie').value) || 52;
+      const tarifKwh = parseFloat(document.getElementById('prixKwh').value) || 0.297;
+      const tarifMin = parseFloat(document.getElementById('prixMin').value) || 0.028;
+      const puissBorne = parseFloat(document.getElementById('puissanceBorne').value) || 25;
+      const puissTaff = parseFloat(document.getElementById('puissanceTaff').value) || 3;
+
+      let kwh = 0;
+      if (mode === 'pct') {
+        const pct = parseFloat(document.getElementById('inputPct').value) || 0;
+        kwh = (pct / 100) * capa;
+      } else {
+        kwh = parseFloat(document.getElementById('inputKwh').value) || 0;
+      }
+
+      const minBorne = (kwh / (puissBorne * 0.9)) * 60;
+      const economie = (kwh * tarifKwh) + (minBorne * tarifMin);
+      const minTaff = (kwh / (puissTaff * 0.9)) * 60;
+
+      document.getElementById('resultatEuro').innerText = economie.toFixed(2).replace('.', ',') + ' €';
+      document.getElementById('resultatDetails').innerText = 
+        `Équivalent : ${kwh.toFixed(1)} kWh • ${formatDuree(minBorne)} sur borne publique (${puissBorne} kW)`;
+      document.getElementById('tempsTaff').innerText = 
+        `⏱️ Temps de branchement au travail : ${formatDuree(minTaff)} (à ${puissTaff.toString().replace('.', ',')} kW)`;
+
+      return { economie, kwh };
+    }
+
+    function afficherTotal() {
+      document.getElementById('totalEconomies').innerText = totalEuros.toFixed(2).replace('.', ',') + ' €';
+      document.getElementById('totalDetails').innerText = `${totalKwh.toFixed(1)} kWh chargés gratuitement au travail`;
+    }
+
+    // Interactions GitHub API
+    async function chargerDepuisGithub() {
+      const user = document.getElementById('ghUser').value.trim();
+      const repo = document.getElementById('ghRepo').value.trim();
+      const token = document.getElementById('ghToken').value.trim();
+
+      if (!user || !repo || !token) {
+        document.getElementById('syncStatus').innerText = 'Mode Local (Token non renseigné)';
+        document.getElementById('syncStatus').className = 'text-xs text-amber-400';
+        return;
+      }
+
+      try {
+        const res = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/data.json`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Erreur API');
+        const data = await res.json();
+        currentSha = data.sha;
+        
+        // Décodage UTF-8 sécurisé du contenu Base64
+        const contentStr = decodeURIComponent(escape(atob(data.content)));
+        const json = JSON.parse(contentStr);
+
+        totalEuros = json.totalEuros || 0;
+        totalKwh = json.totalKwh || 0;
+        
+        document.getElementById('syncStatus').innerText = '🟢 Connecté à GitHub';
+        document.getElementById('syncStatus').className = 'text-xs text-emerald-400 font-semibold';
+        afficherTotal();
+      } catch (e) {
+        document.getElementById('syncStatus').innerText = '🔴 Erreur Synchro GitHub';
+        document.getElementById('syncStatus').className = 'text-xs text-rose-400 font-semibold';
+      }
+    }
+
+    async function ajouterSession() {
+      const res = calculer();
+      if (res.economie <= 0) return;
+
+      const user = document.getElementById('ghUser').value.trim();
+      const repo = document.getElementById('ghRepo').value.trim();
+      const token = document.getElementById('ghToken').value.trim();
+
+      totalEuros += res.economie;
+      totalKwh += res.kwh;
+      afficherTotal();
+
+      if (user && repo && token && currentSha) {
+        document.getElementById('btnSave').innerText = "Enregistrement sur GitHub...";
+        const newContent = {
+          totalEuros: parseFloat(totalEuros.toFixed(2)),
+          totalKwh: parseFloat(totalKwh.toFixed(2))
+        };
+
+        const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(newContent, null, 2))));
+
+        try {
+          const apiRes = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/data.json`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              message: "⚡ MAJ économies recharge R5",
+              content: contentBase64,
+              sha: currentSha
+            })
+          });
+
+          if (apiRes.ok) {
+            const resData = await apiRes.json();
+            currentSha = resData.content.sha;
+            alert("Sauvegardé avec succès dans data.json !");
+          } else {
+            alert("Erreur lors de la mise à jour GitHub.");
+          }
+        } catch (e) {
+          alert("Erreur réseau lors de la sauvegarde.");
+        }
+        document.getElementById('btnSave').innerText = "➕ Enregistrer cette recharge";
+      }
+    }
+
+    // Initialisation
+    calculer();
+    chargerDepuisGithub();
+  </script>
+</body>
+</html>

@@ -9,11 +9,13 @@
 <body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
   <div class="max-w-xl mx-auto space-y-6">
     
+    <!-- En-tête -->
     <header class="text-center space-y-2">
       <h1 class="text-2xl font-bold text-amber-400">⚡ R5 Charge Saver</h1>
       <p class="text-slate-400 text-sm">Économies au travail vs Borne publique</p>
     </header>
 
+    <!-- Carte principale -->
     <main class="bg-slate-800 p-6 rounded-2xl shadow-xl space-y-6 border border-slate-700">
       
       <!-- Choix mode % ou kWh -->
@@ -125,6 +127,10 @@
     document.getElementById('ghRepo').value = localStorage.getItem('r5_gh_repo') || '';
     document.getElementById('ghToken').value = localStorage.getItem('r5_gh_token') || '';
 
+    // Lecture du secours local immédiat au démarrage
+    totalEuros = parseFloat(localStorage.getItem('r5_total_euros')) || 0;
+    totalKwh = parseFloat(localStorage.getItem('r5_total_kwh')) || 0;
+
     function sauvegarderConfig() {
       localStorage.setItem('r5_gh_user', document.getElementById('ghUser').value.trim());
       localStorage.setItem('r5_gh_repo', document.getElementById('ghRepo').value.trim());
@@ -183,7 +189,6 @@
       document.getElementById('totalDetails').innerText = `${totalKwh.toFixed(1)} kWh chargés gratuitement au travail`;
     }
 
-    // Interactions GitHub API
     async function chargerDepuisGithub() {
       const user = document.getElementById('ghUser').value.trim();
       const repo = document.getElementById('ghRepo').value.trim();
@@ -196,20 +201,27 @@
       }
 
       try {
-        const res = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/data.json`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        // Paramètre ?t= anti-cache HTTP
+        const res = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/data.json?t=${Date.now()}`, {
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Cache-Control': 'no-cache'
+          }
         });
         if (!res.ok) throw new Error('Erreur API');
         const data = await res.json();
         currentSha = data.sha;
         
-        // Décodage UTF-8 sécurisé du contenu Base64
         const contentStr = decodeURIComponent(escape(atob(data.content)));
         const json = JSON.parse(contentStr);
 
         totalEuros = json.totalEuros || 0;
         totalKwh = json.totalKwh || 0;
-        
+
+        // Mise à jour du secours local avec les données serveur
+        localStorage.setItem('r5_total_euros', totalEuros);
+        localStorage.setItem('r5_total_kwh', totalKwh);
+
         document.getElementById('syncStatus').innerText = '🟢 Connecté à GitHub';
         document.getElementById('syncStatus').className = 'text-xs text-emerald-400 font-semibold';
         afficherTotal();
@@ -229,6 +241,10 @@
 
       totalEuros += res.economie;
       totalKwh += res.kwh;
+
+      // Mise à jour locale immédiate de l'IHM + localStorage
+      localStorage.setItem('r5_total_euros', totalEuros);
+      localStorage.setItem('r5_total_kwh', totalKwh);
       afficherTotal();
 
       if (user && repo && token && currentSha) {
@@ -270,6 +286,7 @@
 
     // Initialisation
     calculer();
+    afficherTotal();
     chargerDepuisGithub();
   </script>
 </body>

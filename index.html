@@ -54,8 +54,9 @@
       <div class="bg-emerald-950/50 border border-emerald-500/30 rounded-xl p-5 text-center space-y-2">
         <span class="text-xs uppercase tracking-wider text-emerald-400 font-semibold">Économie réalisée sur cette charge</span>
         <div id="resultatEuro" class="text-4xl font-extrabold text-emerald-400">0,00 €</div>
-        <p id="resultatDetails" class="text-xs text-slate-400 pt-1">Équivalent : 0,0 kWh • 0 min sur borne publique</p>
-        <p id="tempsTaff" class="text-xs text-amber-300/90 font-medium pt-1">⏱️ Temps de branchement au travail : 0h00</p>
+        <p id="kmGagnes" class="text-sm font-bold text-emerald-300 pt-1">🛣️ Autonomie gagnée : +0 km</p>
+        <p id="resultatDetails" class="text-xs text-slate-400">Équivalent : 0,0 kWh • 0 min sur borne publique</p>
+        <p id="tempsTaff" class="text-xs text-amber-300/90 font-medium">⏱️ Temps de branchement au travail : 0h00</p>
       </div>
 
       <!-- Bouton d'action -->
@@ -90,6 +91,10 @@
             <input type="number" id="capaBatterie" value="52" step="0.1" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-slate-200 mt-1" onchange="calculer(); afficherTotal();">
           </div>
           <div>
+            <label class="block">Consommation (kWh/100 km)</label>
+            <input type="number" id="consoMoyenne" value="15.0" step="0.1" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-slate-200 mt-1" onchange="calculer(); afficherTotal();">
+          </div>
+          <div>
             <label class="block">Prix électricité (€/kWh)</label>
             <input type="number" id="prixKwh" value="0.297" step="0.001" class="w-full bg-slate-800 border border-slate-700 rounded p-1.5 text-slate-200 mt-1" onchange="calculer()">
           </div>
@@ -112,7 +117,10 @@
         <span id="syncStatus" class="text-xs text-sky-400">Chargement...</span>
       </div>
       <div id="totalEconomies" class="text-3xl font-black text-amber-400">0,00 €</div>
-      <p id="totalDetails" class="text-xs text-slate-400">0 kWh chargés gratuitement au travail</p>
+      <div class="space-y-1">
+        <p id="totalKm" class="text-sm font-bold text-emerald-400">🛣️ 0 km d'autonomie offerts</p>
+        <p id="totalDetails" class="text-xs text-slate-400">0 kWh chargés gratuitement (0 %)</p>
+      </div>
     </section>
   </div>
 
@@ -158,6 +166,7 @@
 
     function calculer() {
       const capa = parseFloat(document.getElementById('capaBatterie').value) || 52;
+      const conso = parseFloat(document.getElementById('consoMoyenne').value) || 15;
       const tarifKwh = parseFloat(document.getElementById('prixKwh').value) || 0.297;
       const tarifMin = parseFloat(document.getElementById('prixMin').value) || 0.028;
       const puissBorne = parseFloat(document.getElementById('puissanceBorne').value) || 25;
@@ -171,11 +180,13 @@
         kwh = parseFloat(document.getElementById('inputKwh').value) || 0;
       }
 
+      const kmGagnes = Math.round((kwh / conso) * 100);
       const minBorne = (kwh / (puissBorne * 0.9)) * 60;
       const economie = (kwh * tarifKwh) + (minBorne * tarifMin);
       const minTaff = (kwh / (puissTaff * 0.9)) * 60;
 
       document.getElementById('resultatEuro').innerText = economie.toFixed(2).replace('.', ',') + ' €';
+      document.getElementById('kmGagnes').innerText = `🛣️ Autonomie gagnée : +${kmGagnes} km`;
       document.getElementById('resultatDetails').innerText = 
         `Équivalent : ${kwh.toFixed(1).replace('.', ',')} kWh • ${formatDuree(minBorne)} sur borne publique (${puissBorne} kW)`;
       document.getElementById('tempsTaff').innerText = 
@@ -186,11 +197,15 @@
 
     function afficherTotal() {
       const capa = parseFloat(document.getElementById('capaBatterie').value) || 52;
+      const conso = parseFloat(document.getElementById('consoMoyenne').value) || 15;
+      
       const totalPct = (totalKwh / capa) * 100;
+      const totalKmGagnes = Math.round((totalKwh / conso) * 100);
 
       document.getElementById('totalEconomies').innerText = totalEuros.toFixed(2).replace('.', ',') + ' €';
+      document.getElementById('totalKm').innerText = `🛣️ ~${totalKmGagnes} km d'autonomie offerts par ton entreprise`;
       document.getElementById('totalDetails').innerText = 
-        `${totalKwh.toFixed(1).replace('.', ',')} kWh chargés gratuitement au travail (soit l'équivalent de ${Math.round(totalPct)} %)`;
+        `${totalKwh.toFixed(1).replace('.', ',')} kWh chargés gratuitement (soit l'équivalent de ${Math.round(totalPct)} % de batterie)`;
     }
 
     async function chargerDepuisGithub() {
@@ -198,7 +213,6 @@
       const repo = document.getElementById('ghRepo').value.trim();
       const token = document.getElementById('ghToken').value.trim();
 
-      // 1. Chargement direct anonyme du fichier data.json servi par GitHub Pages
       try {
         const res = await fetch(`./data.json?t=${Date.now()}`);
         if (res.ok) {
@@ -217,13 +231,10 @@
         console.warn("Impossible de lire data.json directement", e);
       }
 
-      // 2. Si le token est renseigné, appel API GitHub pour récupérer le SHA (pour autoriser l'écriture)
       if (user && repo && token) {
         try {
           const res = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/data.json?t=${Date.now()}`, {
-            headers: { 
-              'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Authorization': `Bearer ${token}` }
           });
           if (!res.ok) throw new Error('Erreur API');
           const data = await res.json();
